@@ -6,69 +6,47 @@
     <title>Radio Anti-Cortes</title>
     <style>
         body { font-family: sans-serif; text-align: center; background: #121212; color: white; padding: 50px; }
-        #status { color: #00ff00; margin: 20px; }
-        button { padding: 20px 40px; font-size: 1.2rem; border-radius: 30px; border: none; cursor: pointer; }
+        #status { color: #00ff00; margin: 20px; font-weight: bold; min-height: 24px; }
+        button { padding: 30px; font-size: 1.5rem; border-radius: 50px; border: none; cursor: pointer; background: #00ff00; color: black; width: 100%; max-width: 300px; }
     </style>
 </head>
 <body>
-    <h1>Mi Radio Ininterrumpida</h1>
-    <div id="status">Estado: Listo</div>
-    <audio id="radioPlayer" preload="auto"></audio>
-    <button id="playBtn">REPRODUCIR</button>
+    <h1>esRadio Directo</h1>
+    <div id="status">Listo para reproducir</div>
+    <button id="playBtn">DAR AL PLAY</button>
 
     <script>
-        const audio = document.getElementById('radioPlayer');
+        const STREAM_URL = "https://stream.esradio.fm/esradio/libertaddigital.mp3";
+        const audio = new Audio(STREAM_URL);
         const btn = document.getElementById('playBtn');
         const status = document.getElementById('status');
-        
-        // Sustituye esta URL por la de tu radio favorita (ej. de un stream .mp3 o .aac)
-        const STREAM_URL = "https://stream.esradio.fm/esradio/libertaddigital.mp3";
-
-        let isPlaying = false;
 
         btn.onclick = () => {
-            if (!isPlaying) {
-                conectar();
-                btn.textContent = "PAUSAR";
+            if (audio.paused) {
+                status.textContent = "Conectando...";
+                audio.play()
+                    .then(() => {
+                        status.textContent = "ESCUCHANDO AHORA";
+                        btn.textContent = "PAUSAR";
+                        btn.style.background = "#ff4444";
+                    })
+                    .catch(err => {
+                        status.textContent = "Error. Reintentando...";
+                        setTimeout(() => btn.click(), 2000);
+                    });
             } else {
                 audio.pause();
                 btn.textContent = "REPRODUCIR";
+                btn.style.background = "#00ff00";
+                status.textContent = "Pausado";
             }
-            isPlaying = !isPlaying;
         };
 
-        function conectar() {
-    status.textContent = "Conectando...";
-    audio.src = STREAM_URL;
-    audio.load(); // Esto fuerza al móvil a cargar el flujo nuevo
-    audio.play().then(() => {
-        status.textContent = "En directo (esRadio)";
-    }).catch(e => {
-        console.log("Esperando conexión...");
-        status.textContent = "Buscando señal...";
-        setTimeout(conectar, 3000); 
-    });
-}
-        }
-
-        // EL SECRETO: Detectar cuando el buffer se queda vacío por falta de red
-        audio.addEventListener('waiting', () => {
-            status.textContent = "Cambiando de red (Buffer)...";
-        });
-
+        // Reconector automático si falla el internet
         audio.addEventListener('stalled', () => {
-            status.textContent = "Reconectando flujo...";
-            conectar();
-        });
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js');
-}
-        // Si el navegador detecta que vuelve internet
-        window.addEventListener('online', () => {
-            if (isPlaying) {
-                status.textContent = "Red recuperada. Sincronizando...";
-                conectar();
-            }
+            status.textContent = "Recuperando señal...";
+            audio.load();
+            audio.play();
         });
     </script>
 </body>
