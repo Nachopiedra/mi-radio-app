@@ -3,77 +3,95 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Radio Pro Samsung</title>
+    <title>esRadio Pro</title>
     <link rel="apple-touch-icon" href="icono.png">
     <link rel="manifest" href="manifest.json">
     <style>
-        body { font-family: sans-serif; text-align: center; background: #000; color: #fff; padding: 50px 20px; }
-        #status { margin: 20px; color: #00ff00; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
+        body { font-family: sans-serif; text-align: center; background: #000; color: #fff; padding: 50px 20px; margin: 0; }
+        h1 { font-size: 1.8rem; margin-bottom: 10px; }
+        #status { margin: 20px; color: #1ed760; font-weight: bold; font-size: 1.1rem; min-height: 1.5em; text-transform: uppercase; }
         button { 
-            padding: 25px; width: 100%; max-width: 300px; border-radius: 15px; border: none;
+            padding: 25px; width: 100%; max-width: 320px; border-radius: 50px; border: none;
             background: #1ed760; color: #000; font-size: 1.5rem; font-weight: bold; cursor: pointer;
-            box-shadow: 0 10px 20px rgba(30,215,96,0.3);
+            box-shadow: 0 10px 20px rgba(30,215,96,0.3); transition: all 0.2s;
         }
-        button:active { transform: scale(0.98); background: #1db954; }
+        button:active { transform: scale(0.96); opacity: 0.9; }
+        .info { margin-top: 40px; color: #666; font-size: 0.9rem; line-height: 1.5; }
     </style>
 </head>
 <body>
-    <h1>esRadio Sin Cortes</h1>
-    <div id="status">PULSA PARA CONECTAR</div>
-    <button id="playBtn">REPRODUCIR</button>
+
+    <h1>esRadio Directo</h1>
+    <div id="status">LISTO PARA CONECTAR</div>
+    
+    <button id="playBtn">DAR AL PLAY</button>
+
+    <div class="info">
+        Esta app detecta cortes de red.<br>
+        Si cambias a 4G, se reconectará sola.
+    </div>
 
     <script>
-        // URL compatible con reproductores Android/Samsung
-       const STREAM_URL = "https://wss.esradio.fm/esradio/libertaddigital.mp3";
+        // URL CORREGIDA CON WSS (Más compatible con Samsung/Chrome)
+        const STREAM_URL = "https://wss.esradio.fm/esradio/libertaddigital.mp3";
         
         let audio = new Audio();
         const btn = document.getElementById('playBtn');
         const status = document.getElementById('status');
+        let isPlaying = false;
 
         function conectar() {
             status.textContent = "CONECTANDO...";
             
-            // Forzamos limpieza del buffer anterior
             audio.pause();
             audio.src = "";
             audio.load();
             
-            // Reasignamos y configuramos
+            // Re-configuración con la URL WSS
             audio.src = STREAM_URL;
-            audio.setAttribute("preload", "auto");
+            audio.preload = "auto";
             
             audio.play().then(() => {
                 status.textContent = "• EN DIRECTO";
                 btn.textContent = "PAUSAR";
                 btn.style.background = "#ff4444";
+                btn.style.boxShadow = "0 10px 20px rgba(255,68,68,0.3)";
+                isPlaying = true;
             }).catch(e => {
-                status.textContent = "BUSCANDO SEÑAL...";
-                console.log("Error de red, reintentando...");
-                setTimeout(conectar, 2000);
+                console.error("Error:", e);
+                status.textContent = "REINTENTANDO SEÑAL...";
+                // Reintento automático en 3 segundos si falla
+                setTimeout(conectar, 3000);
             });
         }
 
         btn.onclick = () => {
-            if (audio.paused || audio.src === "") {
+            if (!isPlaying) {
                 conectar();
             } else {
                 audio.pause();
                 audio.src = "";
+                isPlaying = false;
                 btn.textContent = "REPRODUCIR";
                 btn.style.background = "#1ed760";
+                btn.style.boxShadow = "0 10px 20px rgba(30,215,96,0.3)";
                 status.textContent = "PAUSADO";
             }
         };
 
-        // Si la red cambia (WiFi -> 4G), Samsung suele lanzar 'stalled'
-        audio.addEventListener('stalled', () => {
-            status.textContent = "RECONECTANDO RED...";
-            conectar();
+        // GESTIÓN AUTOMÁTICA DE CORTES
+        audio.addEventListener('error', () => {
+            if(isPlaying) {
+                status.textContent = "RECONECTANDO...";
+                setTimeout(conectar, 1000);
+            }
         });
 
-        // Evento extra para asegurar que no se quede mudo
-        audio.addEventListener('waiting', () => {
-            status.textContent = "CARGANDO AUDIO...";
+        window.addEventListener('online', () => {
+            if(isPlaying) {
+                status.textContent = "RECUPERANDO RED...";
+                conectar();
+            }
         });
     </script>
 </body>
