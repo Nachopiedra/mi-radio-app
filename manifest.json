@@ -1,6 +1,6 @@
 {
-  "name": "esRadio Sin Cortes",
-  "short_name": "esRadio Pro",
+  "name": "Radio FER",
+  "short_name": "Radio FER",
   "start_url": "index.html",
   "display": "standalone",
   "background_color": "#000000",
