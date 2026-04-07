@@ -32,61 +32,73 @@
     </div>
 
     <script>
-        // URL ESTÁNDAR (Sin WSS, directa al MP3)
-        const STREAM_URL = "https://stream.esradio.fm/esradio/libertaddigital.mp3";
+        // URLs con fallback automático
+        const STREAMS = [
+            "https://livestreaming.esradio.fm/stream64.mp3",
+            "https://libertaddigital-radio-live1.flumotion.com/libertaddigital/ld-live1-low.mp3"
+        ];
+        let streamIndex = 0;
         
         const audio = new Audio();
+        audio.preload = "none";
         const btn = document.getElementById('playBtn');
         const status = document.getElementById('status');
         let isPlaying = false;
+        let retryCount = 0;
 
         function conectar() {
             status.textContent = "CONECTANDO...";
-            
-            // Reinicio completo del motor de audio
             audio.pause();
-            audio.src = STREAM_URL;
+            audio.src = STREAMS[streamIndex];
             audio.load();
             
-            // Forzar reproducción
             audio.play().then(() => {
                 status.textContent = "• EN DIRECTO";
                 btn.textContent = "PAUSAR RADIO";
                 btn.style.background = "#ff4444";
                 btn.style.boxShadow = "0 10px 20px rgba(255,68,68,0.4)";
                 isPlaying = true;
+                retryCount = 0;
             }).catch(err => {
-                console.error("Error:", err);
-                status.textContent = "BUSCANDO SEÑAL...";
-                // Reintento automático cada 3 segundos
-                setTimeout(conectar, 3000);
+                console.error("Error stream " + streamIndex + ":", err);
+                // Probar la siguiente URL
+                streamIndex = (streamIndex + 1) % STREAMS.length;
+                retryCount++;
+                if (retryCount < 4) {
+                    status.textContent = "BUSCANDO SEÑAL...";
+                    setTimeout(conectar, 2000);
+                } else {
+                    status.textContent = "SIN SEÑAL. REINTENTA.";
+                    retryCount = 0;
+                    isPlaying = false;
+                }
             });
         }
 
         btn.onclick = () => {
             if (!isPlaying) {
+                retryCount = 0;
+                streamIndex = 0;
                 conectar();
             } else {
                 audio.pause();
-                // Importante: vaciamos el src para que el móvil no siga descargando datos
-                audio.src = ""; 
+                audio.src = "";
                 isPlaying = false;
-                btn.textContent = "REPRODUCIR";
+                btn.textContent = "DAR AL PLAY";
                 btn.style.background = "#1ed760";
                 btn.style.boxShadow = "0 10px 20px rgba(30,215,96,0.4)";
                 status.textContent = "PAUSADO";
             }
         };
 
-        // GESTIÓN DE RECONEXIÓN (WiFi a 4G)
         audio.addEventListener('error', () => {
             if (isPlaying) {
+                streamIndex = (streamIndex + 1) % STREAMS.length;
                 status.textContent = "RECONECTANDO...";
                 setTimeout(conectar, 1500);
             }
         });
 
-        // Si el móvil recupera internet
         window.addEventListener('online', () => {
             if (isPlaying) {
                 status.textContent = "RED DETECTADA...";
@@ -94,9 +106,12 @@
             }
         });
 
-        // Si el audio se queda esperando datos
         audio.addEventListener('waiting', () => {
             if (isPlaying) status.textContent = "CARGANDO SEÑAL...";
+        });
+
+        audio.addEventListener('playing', () => {
+            status.textContent = "• EN DIRECTO";
         });
     </script>
 </body>
