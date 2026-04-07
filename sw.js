@@ -1,11 +1,21 @@
-const CACHE_NAME = 'radio-v1';
+const CACHE_NAME = 'radio-v2';
+const assets = [
+  './',
+  './index.html',
+  './icono.png',
+  './manifest.json'
+];
 
-// Esto mantiene viva la lógica en segundo plano
-self.addEventListener('install', e => {
-  self.skipWaiting();
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(cache => {
+      return cache.addAll(assets);
+    })
+  );
 });
 
 self.addEventListener('fetch', event => {
-  // Simplemente deja pasar las peticiones de audio
-  event.respondWith(fetch(event.request));
+  event.respondWith(
+    fetch(event.request).catch(() => caches.match(event.request))
+  );
 });
