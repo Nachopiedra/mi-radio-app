@@ -38,13 +38,17 @@
         };
 
         function conectar() {
-            status.textContent = "Conectando...";
-            audio.src = STREAM_URL;
-            audio.play().catch(e => {
-                console.log("Esperando conexión...");
-                status.textContent = "Buscando señal...";
-                setTimeout(conectar, 3000); // Reintento automático cada 3 seg
-            });
+    status.textContent = "Conectando...";
+    audio.src = STREAM_URL;
+    audio.load(); // Esto fuerza al móvil a cargar el flujo nuevo
+    audio.play().then(() => {
+        status.textContent = "En directo (esRadio)";
+    }).catch(e => {
+        console.log("Esperando conexión...");
+        status.textContent = "Buscando señal...";
+        setTimeout(conectar, 3000); 
+    });
+}
         }
 
         // EL SECRETO: Detectar cuando el buffer se queda vacío por falta de red
