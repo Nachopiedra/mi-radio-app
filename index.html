@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Radio Anti-Cortes</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; background: #121212; color: white; padding: 50px; }
+        #status { color: #00ff00; margin: 20px; }
+        button { padding: 20px 40px; font-size: 1.2rem; border-radius: 30px; border: none; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Mi Radio Ininterrumpida</h1>
+    <div id="status">Estado: Listo</div>
+    <audio id="radioPlayer" preload="auto"></audio>
+    <button id="playBtn">REPRODUCIR</button>
+
+    <script>
+        const audio = document.getElementById('radioPlayer');
+        const btn = document.getElementById('playBtn');
+        const status = document.getElementById('status');
+        
+        // Sustituye esta URL por la de tu radio favorita (ej. de un stream .mp3 o .aac)
+        const STREAM_URL = "URL_DE_TU_RADIO_AQUI";
+
+        let isPlaying = false;
+
+        btn.onclick = () => {
+            if (!isPlaying) {
+                conectar();
+                btn.textContent = "PAUSAR";
+            } else {
+                audio.pause();
+                btn.textContent = "REPRODUCIR";
+            }
+            isPlaying = !isPlaying;
+        };
+
+        function conectar() {
+            status.textContent = "Conectando...";
+            audio.src = STREAM_URL;
+            audio.play().catch(e => {
+                console.log("Esperando conexión...");
+                status.textContent = "Buscando señal...";
+                setTimeout(conectar, 3000); // Reintento automático cada 3 seg
+            });
+        }
+
+        // EL SECRETO: Detectar cuando el buffer se queda vacío por falta de red
+        audio.addEventListener('waiting', () => {
+            status.textContent = "Cambiando de red (Buffer)...";
+        });
+
+        audio.addEventListener('stalled', () => {
+            status.textContent = "Reconectando flujo...";
+            conectar();
+        });
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js');
+}
+        // Si el navegador detecta que vuelve internet
+        window.addEventListener('online', () => {
+            if (isPlaying) {
+                status.textContent = "Red recuperada. Sincronizando...";
+                conectar();
+            }
+        });
+    </script>
+</body>
+</html>
