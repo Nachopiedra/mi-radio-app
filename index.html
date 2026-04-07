@@ -3,18 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>esRadio Pro Samsung</title>
+    <title>esRadio Pro</title>
     <link rel="apple-touch-icon" href="icono.png">
     <link rel="manifest" href="manifest.json">
     <style>
+        * { box-sizing: border-box; }
         body { font-family: sans-serif; text-align: center; background: #000; color: #fff; padding: 50px 20px; margin: 0; }
         h1 { font-size: 1.6rem; margin-bottom: 5px; }
         #status { margin: 20px; color: #1ed760; font-weight: bold; font-size: 1.1rem; min-height: 1.5em; text-transform: uppercase; }
-        button { 
+        button {
             padding: 25px; width: 100%; max-width: 320px; border-radius: 50px; border: none;
             background: #1ed760; color: #000; font-size: 1.5rem; font-weight: bold; cursor: pointer;
             box-shadow: 0 10px 20px rgba(30,215,96,0.4); transition: all 0.2s;
         }
+        button:disabled { background: #444; color: #888; box-shadow: none; cursor: not-allowed; }
         button:active { transform: scale(0.95); opacity: 0.8; }
         .footer { margin-top: 50px; color: #555; font-size: 0.8rem; line-height: 1.4; }
     </style>
@@ -23,86 +25,123 @@
 
     <h1>esRadio Directo</h1>
     <div id="status">LISTO PARA REPRODUCIR</div>
-    
-    <button id="playBtn">DAR AL PLAY</button>
-
-    <div class="footer">
-        Diseñada para Samsung.<br>
-        Reconexión automática al cambiar a 4G.
-    </div>
+    <button id="playBtn">▶ DAR AL PLAY</button>
+    <div class="footer">Diseñada para Samsung.<br>Reconexión automática al cambiar a 4G.</div>
 
     <script>
-        // URLs con fallback automático
-        const STREAMS = [
-            "https://livestreaming.esradio.fm/stream64.mp3",
-            "https://libertaddigital-radio-live1.flumotion.com/libertaddigital/ld-live1-low.mp3"
-        ];
-        let streamIndex = 0;
-        
-        const audio = new Audio();
-        audio.preload = "none";
         const btn = document.getElementById('playBtn');
         const status = document.getElementById('status');
-        let isPlaying = false;
-        let retryCount = 0;
+        const audio = new Audio();
+        audio.preload = "none";
 
-        function conectar() {
+        let isPlaying = false;
+        let streamUrls = [];
+        let streamIndex = 0;
+
+        // Servidores RadioBrowser (usa varios por si uno falla)
+        const RB_SERVERS = [
+            'https://de1.api.radio-browser.info',
+            'https://nl1.api.radio-browser.info',
+            'https://at1.api.radio-browser.info'
+        ];
+
+        async function obtenerUrlStream() {
+            status.textContent = "BUSCANDO EMISORA...";
+            for (const server of RB_SERVERS) {
+                try {
+                    const res = await fetch(
+                        `${server}/json/stations/search?name=esradio&countrycode=ES&limit=10&hidebroken=true&order=clickcount&reverse=true`,
+                        { headers: { 'User-Agent': 'esRadioApp/1.0' } }
+                    );
+                    const data = await res.json();
+                    if (data && data.length > 0) {
+                        // Filtramos solo las que tienen url_resolved y lastcheckok=1
+                        const activas = data.filter(s => s.url_resolved && s.lastcheckok == 1);
+                        if (activas.length > 0) {
+                            streamUrls = activas.map(s => s.url_resolved);
+                            console.log("Streams encontrados:", streamUrls);
+                            return true;
+                        }
+                    }
+                } catch (e) {
+                    console.warn("Fallo servidor RadioBrowser:", server, e);
+                }
+            }
+            return false;
+        }
+
+        async function conectar() {
+            if (streamUrls.length === 0) {
+                const ok = await obtenerUrlStream();
+                if (!ok) {
+                    status.textContent = "ERROR: SIN CONEXIÓN A INTERNET";
+                    btn.disabled = false;
+                    btn.textContent = "▶ REINTENTAR";
+                    return;
+                }
+                streamIndex = 0;
+            }
+
             status.textContent = "CONECTANDO...";
             audio.pause();
-            audio.src = STREAMS[streamIndex];
+            audio.src = streamUrls[streamIndex];
             audio.load();
-            
-            audio.play().then(() => {
-                status.textContent = "• EN DIRECTO";
-                btn.textContent = "PAUSAR RADIO";
+
+            try {
+                await audio.play();
+                status.textContent = "● EN DIRECTO";
+                btn.textContent = "⏸ PAUSAR";
                 btn.style.background = "#ff4444";
                 btn.style.boxShadow = "0 10px 20px rgba(255,68,68,0.4)";
+                btn.disabled = false;
                 isPlaying = true;
-                retryCount = 0;
-            }).catch(err => {
-                console.error("Error stream " + streamIndex + ":", err);
-                // Probar la siguiente URL
-                streamIndex = (streamIndex + 1) % STREAMS.length;
-                retryCount++;
-                if (retryCount < 4) {
-                    status.textContent = "BUSCANDO SEÑAL...";
-                    setTimeout(conectar, 2000);
+            } catch (err) {
+                console.error("Error reproduciendo stream " + streamIndex + ":", err);
+                streamIndex++;
+                if (streamIndex < streamUrls.length) {
+                    status.textContent = "PROBANDO OTRA SEÑAL...";
+                    setTimeout(conectar, 1500);
                 } else {
-                    status.textContent = "SIN SEÑAL. REINTENTA.";
-                    retryCount = 0;
-                    isPlaying = false;
+                    // Agotamos todas las URLs, volver a buscar en RadioBrowser
+                    streamUrls = [];
+                    status.textContent = "RECONECTANDO...";
+                    setTimeout(conectar, 3000);
+                    btn.disabled = false;
                 }
-            });
+            }
+        }
+
+        function pausar() {
+            audio.pause();
+            audio.src = "";
+            isPlaying = false;
+            btn.textContent = "▶ DAR AL PLAY";
+            btn.style.background = "#1ed760";
+            btn.style.boxShadow = "0 10px 20px rgba(30,215,96,0.4)";
+            status.textContent = "PAUSADO";
         }
 
         btn.onclick = () => {
             if (!isPlaying) {
-                retryCount = 0;
-                streamIndex = 0;
+                btn.disabled = true;
+                streamUrls = []; // Forzar búsqueda fresca cada vez
                 conectar();
             } else {
-                audio.pause();
-                audio.src = "";
-                isPlaying = false;
-                btn.textContent = "DAR AL PLAY";
-                btn.style.background = "#1ed760";
-                btn.style.boxShadow = "0 10px 20px rgba(30,215,96,0.4)";
-                status.textContent = "PAUSADO";
+                pausar();
             }
         };
 
         audio.addEventListener('error', () => {
             if (isPlaying) {
-                streamIndex = (streamIndex + 1) % STREAMS.length;
-                status.textContent = "RECONECTANDO...";
-                setTimeout(conectar, 1500);
-            }
-        });
-
-        window.addEventListener('online', () => {
-            if (isPlaying) {
-                status.textContent = "RED DETECTADA...";
-                conectar();
+                isPlaying = false;
+                streamIndex++;
+                if (streamIndex < streamUrls.length) {
+                    conectar();
+                } else {
+                    streamUrls = [];
+                    status.textContent = "RECONECTANDO...";
+                    setTimeout(conectar, 3000);
+                }
             }
         });
 
@@ -111,7 +150,15 @@
         });
 
         audio.addEventListener('playing', () => {
-            status.textContent = "• EN DIRECTO";
+            status.textContent = "● EN DIRECTO";
+            isPlaying = true;
+        });
+
+        window.addEventListener('online', () => {
+            if (isPlaying) {
+                streamUrls = [];
+                conectar();
+            }
         });
     </script>
 </body>
