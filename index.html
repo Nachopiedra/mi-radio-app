@@ -374,21 +374,9 @@
     }
 
     function iniciarVisualizador() {
-        try {
-            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-            if (!sourceNode) {
-                sourceNode = audioCtx.createMediaElementSource(audio);
-                analyser   = audioCtx.createAnalyser();
-                analyser.fftSize = 64;
-                sourceNode.connect(analyser);
-                analyser.connect(audioCtx.destination);
-            }
-            visualizerEl.classList.add('visible');
-            dibujarViz();
-        } catch(e) {
-            animarVizFallback();
-        }
+    // Usamos siempre el fallback animado para no interferir con el audio en Android
+    animarVizFallback();
+}
     }
 
     function dibujarViz() {
